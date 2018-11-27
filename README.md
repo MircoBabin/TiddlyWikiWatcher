@@ -5,7 +5,7 @@ And then moves the download automatically to the original filename.
 ![Screenshot](screenshot.png)
 
 # Download binary
-For Windows (.NET framework 2.0 / .NET framework 4), [the latest version can be found here](/releases/latest "Lastest Version").
+For Windows (.NET framework 2.0 / .NET framework 4), [the latest version can be found here](https://github.com/MircoBabin/TiddlyWikiWatcher/releases/latest "Lastest Version").
 
 Download the zip and unpack it somewhere on your computer. Then run TiddlyWikiWatcher.exe (or make a shortcut on your desktop to it).
 
