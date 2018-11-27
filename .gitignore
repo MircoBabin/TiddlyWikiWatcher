@@ -1,0 +1,6 @@
+/bin
+/obj
+/.vs
+src/bin
+src/obj
+src/.vs
