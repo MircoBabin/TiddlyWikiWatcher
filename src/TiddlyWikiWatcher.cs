@@ -42,8 +42,11 @@ namespace TiddlyWikiWatcher
 
             if (disposing)
             {
-                _watcher.Dispose();
-                _handler.Dispose();
+                if (_watcher != null)
+                {
+                    _watcher.Dispose();
+                    _handler.Dispose();
+                }
             }
         }
     }
