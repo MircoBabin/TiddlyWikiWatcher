@@ -1,3 +1,6 @@
+[![Github All Releases](https://img.shields.io/github/downloads/MircoBabin/TiddlyWikiWatcher/total)](https://github.com/MircoBabin/TiddlyWikiWatcher/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/MircoBabin/TiddlyWikiWatcher/blob/master/LICENSE.md)
+
 # Tiddly Wiki save Watcher
 Tiddly Wiki save Watcher watches the [Tiddly Wiki](https://tiddlywiki.com/ "Tiddly Wiki") being saved by the browser to the Downloads folder. 
 And then moves the download automatically to the original filename.
