@@ -4,3 +4,6 @@
 src/bin
 src/obj
 src/.vs
+src/TiddlyWikiWatcher/bin
+src/TiddlyWikiWatcher/obj
+src/TiddlyWikiWatcher/.vs
