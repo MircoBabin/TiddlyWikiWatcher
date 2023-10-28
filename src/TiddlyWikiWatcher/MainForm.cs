@@ -1,6 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 
@@ -8,6 +12,7 @@ namespace TiddlyWikiWatcher
 {
     public partial class MainForm : Form //, ITiddlyWikiWatcherLogger
     {
+        private Mutex singleInstanceMutex;
         private bool _watching = false;
         private DownloadedFileHandler _downloadHandler;
         private List<CoreWebView2DownloadOperation> _downloadsBusy = new List<CoreWebView2DownloadOperation>();
@@ -29,7 +34,15 @@ namespace TiddlyWikiWatcher
             {
                 FilenameTextbox.Text = filename;
 
-                if (autoopen) Open();
+                if (autoopen)
+                {
+                    Open();
+                    if (!_watching)
+                    {
+                        Application.Exit();
+                        Environment.Exit(0);
+                    }
+                }
             }
         }
 
@@ -152,6 +165,12 @@ namespace TiddlyWikiWatcher
                 return;
             }
 
+            if (!IsSingleInstance(filename))
+            {
+                MessageBox.Show("Filename is opened in another instance of Tiddly Wiki Watcher.");
+                return;
+            }
+
             FilenameOpen.Visible = false;
             FilenameOpen.Enabled = false;
             FilenameTextbox.Enabled = false;
@@ -163,6 +182,29 @@ namespace TiddlyWikiWatcher
             _watching = true;
             _downloadHandler = new DownloadedFileHandler(filename, null);
             webView.Source = new System.Uri(filename);
+        }
+
+        private bool IsSingleInstance(string filename)
+        {
+            string singleInstanceMutexName;
+            using (SHA256 sha256Hash = SHA256.Create())
+            {
+                byte[] hash = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(filename));
+
+                singleInstanceMutexName = "TiddlyWikiWatcher." + BitConverter.ToString(hash).Replace("-", string.Empty);
+            }
+
+            bool firstInstance = false;
+            singleInstanceMutex = new Mutex(true, singleInstanceMutexName, out firstInstance);
+            if (firstInstance)
+            {
+                return true;
+            }
+
+            singleInstanceMutex.Dispose();
+            singleInstanceMutex = null;
+
+            return false;
         }
 
         /*
