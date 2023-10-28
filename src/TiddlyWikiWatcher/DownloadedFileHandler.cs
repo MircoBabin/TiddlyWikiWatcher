@@ -11,6 +11,7 @@ namespace TiddlyWikiWatcher
         private List<string> _fileQueue = new List<string>();
         private Thread _thread = null;
         private Semaphore _threadContinue = null;
+        private volatile bool _threadIsBusy = false;
 
         private ITiddlyWikiWatcherLogger _logger;
 
@@ -64,7 +65,18 @@ namespace TiddlyWikiWatcher
             _logger = null;
         }
 
-        public void DownloadsWatcher_HandleFile(string FullPath)
+        public bool IsBusy()
+        {
+            lock (_fileQueue)
+            {
+                if (_fileQueue.Count != 0) return true;
+                if (_threadIsBusy) return true;
+
+                return false;
+            }
+        }
+
+        public void AddFile(string FullPath)
         {
             //Put in _fileQueue, and handle in thread. So watcher can continue
             lock (_fileQueue)
@@ -81,6 +93,7 @@ namespace TiddlyWikiWatcher
                 _threadContinue.WaitOne();
                 if (_terminate) break;
 
+                _threadIsBusy = true;
                 try
                 {
                     string fullpath = null;
@@ -96,6 +109,7 @@ namespace TiddlyWikiWatcher
                     if (fullpath != null) HandleFile(fullpath);
                 }
                 catch { }
+                _threadIsBusy = false;
             }
         }
 

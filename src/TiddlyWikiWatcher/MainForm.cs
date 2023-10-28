@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
@@ -9,6 +10,7 @@ namespace TiddlyWikiWatcher
     {
         private bool _watching = false;
         private DownloadedFileHandler _downloadHandler;
+        private List<CoreWebView2DownloadOperation> _downloadsBusy = new List<CoreWebView2DownloadOperation>();
 
         private MainForm()
         {
@@ -107,6 +109,29 @@ namespace TiddlyWikiWatcher
             Open();
         }
 
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            lock (_downloadsBusy)
+            {
+                if (_downloadsBusy.Count > 0)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+            }
+
+            if (_downloadHandler != null)
+            {
+                if (_downloadHandler.IsBusy())
+                {
+                    e.Cancel = true;
+                    return;
+                }
+            }
+
+            e.Cancel = false;
+        }
+
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
         {
             if (_downloadHandler != null)
@@ -158,10 +183,6 @@ namespace TiddlyWikiWatcher
         private void MainForm_Resize(object sender, EventArgs e)
         {
             webView.Size = this.ClientSize - new System.Drawing.Size(webView.Location);
-            /*
-            goButton.Left = this.ClientSize.Width - goButton.Width;
-            addressBar.Width = goButton.Left - addressBar.Left;
-            */
         }
 
         private void webView_CoreWebView2InitializationCompleted(object sender, CoreWebView2InitializationCompletedEventArgs e)
@@ -173,16 +194,43 @@ namespace TiddlyWikiWatcher
         {
             var download = e.DownloadOperation;
 
+            lock (_downloadsBusy)
+            {
+                _downloadsBusy.Add(download);
+            }
+
             download.StateChanged += delegate (object _sender, Object ev)
             {
                 webView.CoreWebView2.CloseDefaultDownloadDialog();
 
-                if (download.State == CoreWebView2DownloadState.Completed)
+                bool done = false;
+                switch(download.State)
                 {
-                    this.Invoke((MethodInvoker)delegate
+                    case CoreWebView2DownloadState.Completed:
+                        _downloadHandler.AddFile(download.ResultFilePath);
+                        done = true;
+                        break;
+
+                    case CoreWebView2DownloadState.Interrupted:
+                        done = true;
+                        break;
+                }
+
+                if (done)
+                {
+                    lock (_downloadsBusy)
                     {
-                        _downloadHandler.DownloadsWatcher_HandleFile(download.ResultFilePath);
-                    });
+                        for (int i = 0; i < _downloadsBusy.Count; i++)
+                        {
+                            var busy = _downloadsBusy[i];
+
+                            if (busy == download)
+                            {
+                                _downloadsBusy.RemoveAt(i);
+                                break;
+                            }
+                        }
+                    }
                 }
             }; 
         }
