@@ -12,6 +12,8 @@ namespace TiddlyWikiWatcher
 {
     public partial class MainForm : Form //, ITiddlyWikiWatcherLogger
     {
+        private const string FormTitle = "Tiddly Wiki Watcher";
+
         private string singleInstanceMutexName;
         private Mutex singleInstanceMutex;
         private bool _watching = false;
@@ -24,7 +26,12 @@ namespace TiddlyWikiWatcher
 
             _downloadHandler = null;
 
+            this.Text = FormTitle;
             FilenameTextbox.Text = AppSettings_LoadFilename();
+
+            webView.Visible = false;
+            webView.Location = new System.Drawing.Point(0, 0);
+            webView.Size = this.ClientSize - new System.Drawing.Size(webView.Location);
 
             WindowState = FormWindowState.Maximized;
         }
@@ -171,13 +178,19 @@ namespace TiddlyWikiWatcher
                 MessageBox.Show("Filename is opened in another instance of Tiddly Wiki Watcher.");
                 return;
             }
+            AppSettings_SaveFilename(filename);
 
-            FilenameOpen.Visible = false;
-            FilenameOpen.Enabled = false;
+            FilenameLabel.Visible = false;
+            FilenameTextbox.Visible = false;
             FilenameTextbox.Enabled = false;
             FilenameSelect.Visible = false;
             FilenameSelect.Enabled = false;
-            AppSettings_SaveFilename(filename);
+            FilenameOpen.Visible = false;
+            FilenameOpen.Enabled = false;
+
+            this.Text = FormTitle + " - " + filename;
+            webView.Visible = true;
+            webView.Size = this.ClientSize - new System.Drawing.Size(webView.Location);
 
             // var downloadsPath = KnownFolderPaths.KnownFolders.GetPath(KnownFolderPaths.KnownFolder.Downloads);
             _watching = true;
