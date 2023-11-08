@@ -248,6 +248,20 @@ namespace TiddlyWikiWatcher
         private void webView_CoreWebView2InitializationCompleted(object sender, CoreWebView2InitializationCompletedEventArgs e)
         {
             webView.CoreWebView2.DownloadStarting += webView_DownloadStarting;
+            webView.CoreWebView2.NewWindowRequested += CoreWebView2_NewWindowRequested;
+        }
+
+        private void CoreWebView2_NewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs e)
+        {
+            e.Handled = true;
+
+            ProcessStartInfo psi = new ProcessStartInfo
+            {
+                FileName = e.Uri,
+                UseShellExecute = true,
+                WindowStyle = ProcessWindowStyle.Normal
+            };
+            Process.Start(psi);
         }
 
         private void webView_DownloadStarting(object sender, CoreWebView2DownloadStartingEventArgs e)
