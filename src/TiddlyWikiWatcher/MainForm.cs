@@ -36,20 +36,25 @@ namespace TiddlyWikiWatcher
             WindowState = FormWindowState.Maximized;
         }
 
-        public MainForm(string filename, bool autoopen) : this()
+        public MainForm(string filename) : this()
         {
             if (!String.IsNullOrEmpty(filename))
             {
                 FilenameTextbox.Text = filename;
 
-                if (autoopen)
+                try
                 {
                     Open();
-                    if (!_watching)
-                    {
-                        Application.Exit();
-                        Environment.Exit(0);
-                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message);
+                }
+
+                if (!_watching)
+                {
+                    Application.Exit();
+                    Environment.Exit(0);
                 }
             }
         }

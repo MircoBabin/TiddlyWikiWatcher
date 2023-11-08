@@ -10,7 +10,6 @@ namespace TiddlyWikiWatcher
     static class Program
     {
         static string _filename = null;
-        static bool _autoOpen = false;
 
         public static List<string> installationFilenames = new List<string>()
         {
@@ -89,13 +88,13 @@ namespace TiddlyWikiWatcher
             for (int i = 0; i < args.Length; i++)
             {
                 arg = args[i];
-                if (arg.Length >= 9 && arg.Substring(0, 9).ToLower() == "-autoopen")
+                if (arg.Length > 0)
                 {
-                    _autoOpen = true;
-                }
-                else if (arg.Length > 0)
-                {
-                    _filename = arg;
+                    if (_filename == null && File.Exists(arg))
+                    {
+                        // only use first existing filename on commandline
+                        _filename = arg;
+                    }
                 }
             }
         }
@@ -113,7 +112,7 @@ namespace TiddlyWikiWatcher
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm(_filename, _autoOpen));
+            Application.Run(new MainForm(_filename));
         }
     }
 }

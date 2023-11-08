@@ -18,11 +18,9 @@ Download the zip and unpack it somewhere on your computer. Then run TiddlyWikiWa
 *For unattended automatic installation scripts, read the section "Automatic installation scripts" lower down the page.*
 
 # Commandline arguments
-TiddlyWikiWatcher.exe "full-path-to-tiddly-wiki-file.html" {-autoopen}
+TiddlyWikiWatcher.exe "full-path-to-tiddly-wiki-file.html"
 
-The optional **-autoopen** automatically starts the provided **file** argument when TiddlyWikiWatcher.exe is started.
-
-e.g. TiddlyWikiWatcher.exe "D:\AaRiverside\aaaDevelopment\wiki\wiki - Mirco.html" -autoopen
+e.g. TiddlyWikiWatcher.exe "D:\AaRiverside\aaaDevelopment\wiki\wiki - Mirco.html"
 
 # Why
 Previously I used the Tiddly Wiki Chrome extension to maintain my personal wiki. 
