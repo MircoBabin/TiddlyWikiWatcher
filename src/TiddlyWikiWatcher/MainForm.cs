@@ -12,6 +12,7 @@ namespace TiddlyWikiWatcher
 {
     public partial class MainForm : Form //, ITiddlyWikiWatcherLogger
     {
+        private string singleInstanceMutexName;
         private Mutex singleInstanceMutex;
         private bool _watching = false;
         private DownloadedFileHandler _downloadHandler;
@@ -153,7 +154,7 @@ namespace TiddlyWikiWatcher
             }
         }
 
-        private void Open()
+        private async void Open()
         {
             var filename = FilenameTextbox.Text;
 
@@ -181,15 +182,32 @@ namespace TiddlyWikiWatcher
             // var downloadsPath = KnownFolderPaths.KnownFolders.GetPath(KnownFolderPaths.KnownFolder.Downloads);
             _watching = true;
             _downloadHandler = new DownloadedFileHandler(filename, null);
+
+            var webViewUserDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), singleInstanceMutexName);
+            if (Directory.Exists(webViewUserDataFolder))
+            {
+                try
+                {
+                    Directory.Delete(webViewUserDataFolder, true);
+                }
+                catch { }
+            }
+            if (!Directory.Exists(webViewUserDataFolder))
+            {
+                Directory.CreateDirectory(webViewUserDataFolder);
+            }
+
+            var webViewEnvironment = await CoreWebView2Environment.CreateAsync(null, webViewUserDataFolder);
+            await webView.EnsureCoreWebView2Async(webViewEnvironment);
+
             webView.Source = new System.Uri(filename);
         }
 
         private bool IsSingleInstance(string filename)
         {
-            string singleInstanceMutexName;
             using (SHA256 sha256Hash = SHA256.Create())
             {
-                byte[] hash = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(filename));
+                byte[] hash = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(filename.ToLowerInvariant()));
 
                 singleInstanceMutexName = "TiddlyWikiWatcher." + BitConverter.ToString(hash).Replace("-", string.Empty);
             }
