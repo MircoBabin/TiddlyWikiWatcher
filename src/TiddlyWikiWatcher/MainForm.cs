@@ -5,6 +5,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 
@@ -38,6 +39,40 @@ namespace TiddlyWikiWatcher
 
         public MainForm(string filename) : this()
         {
+            // Check if WebView2 is installed
+            try
+            {
+                CoreWebView2Environment.GetAvailableBrowserVersionString();
+            }
+            catch (Exception ex)
+            {
+                // WebView2 runtime is not installed or there is some other issue with it
+                var result = CustomDialogBox.Show(this.Text,
+                    "Microsoft WebView2 is not installed.\n" +
+                    "Use the install button to download the Microsoft WebView2 Evergreen installer.\n" +
+                    "\n" +
+                    "Details: " + ex.Message,
+                    CustomDialogBox.Result.Button2,
+                    "Install WebView2", "Exit");
+                if (result == CustomDialogBox.Result.Button1)
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "https://go.microsoft.com/fwlink/p/?LinkId=2124703",
+                            UseShellExecute = true,
+                        });
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                Application.Exit();
+                Environment.Exit(0);
+            }
+
             if (!String.IsNullOrEmpty(filename))
             {
                 FilenameTextbox.Text = filename;
@@ -135,8 +170,43 @@ namespace TiddlyWikiWatcher
             Open();
         }
 
+        private bool FormClose_TiddlyWikiIsNotDirty = false;
+        private async void FormCloseIfTiddlyWikiIsNotDirty()
+        {
+            var result = await webView.CoreWebView2.ExecuteScriptAsync("(document.body.classList.contains('tc-dirty') ? 1 : 0)");
+            if (result != "0")
+            {
+                this.Invoke((MethodInvoker)delegate
+                {
+                    var button = CustomDialogBox.Show(this.Text,
+                        "The Tiddly Wiki has unsaved changes.\n" +
+                        "- Cancel and then manually save the changes.\n" +
+                        "- Or discard all unsaved changes.",
+                        CustomDialogBox.Result.Button2,
+                        "Exit - discard all unsaved changes", "Cancel"
+                        );
+
+                    if (button == CustomDialogBox.Result.Button1)
+                    {
+                        FormClose_TiddlyWikiIsNotDirty = true;
+                        this.Close(); // calls MainForm_FormClosing again!
+                    }
+                });
+                return;
+            }
+
+            FormClose_TiddlyWikiIsNotDirty = true;
+            this.Invoke((MethodInvoker)delegate
+            {
+                this.Close(); // calls MainForm_FormClosing again!
+            });
+        }
+
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
+            var notDirty = FormClose_TiddlyWikiIsNotDirty;
+            FormClose_TiddlyWikiIsNotDirty = false;
+
             lock (_downloadsBusy)
             {
                 if (_downloadsBusy.Count > 0)
@@ -151,6 +221,16 @@ namespace TiddlyWikiWatcher
                 if (_downloadHandler.IsBusy())
                 {
                     e.Cancel = true;
+                    return;
+                }
+            }
+
+            if (_watching)
+            {
+                if (!notDirty)
+                {
+                    e.Cancel = true;
+                    FormCloseIfTiddlyWikiIsNotDirty();
                     return;
                 }
             }
@@ -296,7 +376,7 @@ namespace TiddlyWikiWatcher
                 webView.CoreWebView2.CloseDefaultDownloadDialog();
 
                 bool done = false;
-                switch(download.State)
+                switch (download.State)
                 {
                     case CoreWebView2DownloadState.Completed:
                         _downloadHandler.AddFile(download.ResultFilePath);
@@ -324,7 +404,7 @@ namespace TiddlyWikiWatcher
                         }
                     }
                 }
-            }; 
+            };
         }
     }
 }
