@@ -1,5 +1,9 @@
 # Tiddly Wiki Watcher changelog
 
+## Version 2.3
+* fix: check if WebView2 is installed.
+* fix: check for unsaved changes.
+
 ## Version 2.2
 * fix: WebView User Data Folder (UDF) in %localappdata%.
 * fix: open external url in browser.
