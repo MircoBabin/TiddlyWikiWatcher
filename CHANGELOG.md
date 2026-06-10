@@ -1,5 +1,8 @@
 # Tiddly Wiki Watcher changelog
 
+## Version 2.5
+* fix: allow file:// url access.
+
 ## Version 2.4
 * add: save as dialog when export tiddler or another download started.
 * add: Show log to the system menu
