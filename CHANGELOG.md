@@ -1,5 +1,9 @@
 # Tiddly Wiki Watcher changelog
 
+## Version 2.4
+* add: save as dialog when export tiddler or another download started.
+* add: Show log to the system menu
+
 ## Version 2.3
 * fix: check if WebView2 is installed.
 * fix: check for unsaved changes.
