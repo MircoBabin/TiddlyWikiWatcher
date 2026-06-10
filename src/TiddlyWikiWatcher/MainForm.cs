@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -11,7 +12,7 @@ using Microsoft.Web.WebView2.Core;
 
 namespace TiddlyWikiWatcher
 {
-    public partial class MainForm : Form, ITiddlyWikiWatcherSaveAs //, ITiddlyWikiWatcherLogger
+    public partial class MainForm : Form, ITiddlyWikiWatcherSaveAs
     {
         private const string FormTitle = "Tiddly Wiki Watcher";
 
@@ -20,6 +21,52 @@ namespace TiddlyWikiWatcher
         private bool _watching = false;
         private DownloadedFileHandler _downloadHandler;
         private List<CoreWebView2DownloadOperation> _downloadsBusy = new List<CoreWebView2DownloadOperation>();
+
+        private LogForm _logForm;
+
+        private class NativeMethods
+        {
+            // P/Invoke constants
+            public const int WM_SYSCOMMAND = 0x112;
+            public const int MF_STRING = 0x0;
+            public const int MF_SEPARATOR = 0x800;
+
+            // P/Invoke declarations
+            [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+            public static extern IntPtr GetSystemMenu(IntPtr hWnd, bool bRevert);
+
+            [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+            public static extern bool AppendMenu(IntPtr hMenu, int uFlags, int uIDNewItem, string lpNewItem);
+        }
+        // ID for the About item on the system menu
+        private int SYSMENU_SHOWLOG = 0x1;
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+
+            // Get a handle to a copy of this form's system (window) menu
+            IntPtr hSysMenu = NativeMethods.GetSystemMenu(this.Handle, false);
+
+            // Add a separator
+            NativeMethods.AppendMenu(hSysMenu, NativeMethods.MF_SEPARATOR, 0, string.Empty);
+
+            // Add the Show log
+            NativeMethods.AppendMenu(hSysMenu, NativeMethods.MF_STRING, SYSMENU_SHOWLOG, "Show log");
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            base.WndProc(ref m);
+
+            // Test if the Show log was selected from the system menu
+            if ((m.Msg == NativeMethods.WM_SYSCOMMAND) && ((int)m.WParam == SYSMENU_SHOWLOG))
+            {
+                _logForm.Visible = true;
+                _logForm.Focus();
+            }
+        }
+
 
         private MainForm()
         {
@@ -35,6 +82,12 @@ namespace TiddlyWikiWatcher
             webView.Size = this.ClientSize - new System.Drawing.Size(webView.Location);
 
             WindowState = FormWindowState.Maximized;
+
+            _logForm = new LogForm();
+
+            // bugfix for System.InvalidOperationException: 'Invoke of BeginInvoke kan niet op een besturingselement worden aangeroepen tot de vensterkoppeling is gemaakt.'
+            _logForm.Visible = true;
+            _logForm.Visible = false;
         }
 
         public MainForm(string filename) : this()
@@ -273,13 +326,14 @@ namespace TiddlyWikiWatcher
             FilenameOpen.Visible = false;
             FilenameOpen.Enabled = false;
 
+            _logForm.TiddlyWikiWatcher_Log("Open Tiddly Wiki file " + filename);
             this.Text = FormTitle + " - " + filename;
             webView.Visible = true;
             webView.Size = this.ClientSize - new System.Drawing.Size(webView.Location);
 
             // var downloadsPath = KnownFolderPaths.KnownFolders.GetPath(KnownFolderPaths.KnownFolder.Downloads);
             _watching = true;
-            _downloadHandler = new DownloadedFileHandler(filename, this, null);
+            _downloadHandler = new DownloadedFileHandler(filename, this, _logForm);
 
             var webViewUserDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), singleInstanceMutexName);
             if (Directory.Exists(webViewUserDataFolder))
@@ -322,21 +376,6 @@ namespace TiddlyWikiWatcher
 
             return false;
         }
-
-        /*
-        public void TiddlyWikiWatcher_Log(string text)
-        {
-            this.Invoke((MethodInvoker)delegate
-            {
-                if (text.Length == 0)
-                    LogListbox.Items.Add("");
-                else
-                    LogListbox.Items.Add("[" + DateTime.Now.ToString("HH:mm:ss") + "] " + text);
-
-                LogListbox.SelectedIndex = LogListbox.Items.Count - 1;
-            });
-        }
-        */
 
         public string TiddlyWikiWatcher_SaveAs(string tiddlyWikiFullpath, string fullpath)
         {
