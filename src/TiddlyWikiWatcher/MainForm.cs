@@ -349,7 +349,11 @@ namespace TiddlyWikiWatcher
                 Directory.CreateDirectory(webViewUserDataFolder);
             }
 
-            var webViewEnvironment = await CoreWebView2Environment.CreateAsync(null, webViewUserDataFolder);
+            var options = new CoreWebView2EnvironmentOptions()
+            {
+                AdditionalBrowserArguments = "--allow-file-access-from-files",
+            };
+            var webViewEnvironment = await CoreWebView2Environment.CreateAsync(null, webViewUserDataFolder, options);
             await webView.EnsureCoreWebView2Async(webViewEnvironment);
 
             webView.Source = new System.Uri(filename);
@@ -416,6 +420,10 @@ namespace TiddlyWikiWatcher
         {
             webView.CoreWebView2.DownloadStarting += webView_DownloadStarting;
             webView.CoreWebView2.NewWindowRequested += CoreWebView2_NewWindowRequested;
+
+            // Setup logging of WebResource
+            webView.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+            webView.CoreWebView2.WebResourceRequested += CoreWebView2_WebResourceRequested;
         }
 
         private void CoreWebView2_NewWindowRequested(object sender, CoreWebView2NewWindowRequestedEventArgs e)
@@ -429,6 +437,32 @@ namespace TiddlyWikiWatcher
                 WindowStyle = ProcessWindowStyle.Normal
             };
             Process.Start(psi);
+        }
+
+        private void CoreWebView2_WebResourceRequested(object sender, CoreWebView2WebResourceRequestedEventArgs e)
+        {
+            _logForm.TiddlyWikiWatcher_Log("WebResourceRequest [" + e.ResourceContext + "] " + e.Request.Uri);
+            if (e.Request.Uri.StartsWith("file://"))
+            {
+                string filename = Uri.UnescapeDataString(e.Request.Uri.Substring(7));
+                if (filename.StartsWith("/"))
+                {
+                    if (filename.Length > 1)
+                        filename = filename.Substring(1);
+                    else
+                        filename = string.Empty;
+                }
+                filename = filename.Replace('/', '\\');
+
+                if (File.Exists(filename))
+                {
+                    _logForm.TiddlyWikiWatcher_Log("    Existing file \"" + filename + "\".");
+                }
+                else
+                {
+                    _logForm.TiddlyWikiWatcher_Log("    Unexisting file \"" + filename + "\".");
+                }
+            }
         }
 
         private void webView_DownloadStarting(object sender, CoreWebView2DownloadStartingEventArgs e)
