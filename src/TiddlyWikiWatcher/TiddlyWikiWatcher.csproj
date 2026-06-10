@@ -74,6 +74,7 @@
     </Compile>
     <Compile Include="CustomDialogBox.cs" />
     <Compile Include="DownloadedFileHandler.cs" />
+    <Compile Include="ITiddlyWikiWatcherSaveAs.cs" />
     <Compile Include="ITiddlyWikiWatcherLogger.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>

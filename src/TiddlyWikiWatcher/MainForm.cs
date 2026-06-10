@@ -11,7 +11,7 @@ using Microsoft.Web.WebView2.Core;
 
 namespace TiddlyWikiWatcher
 {
-    public partial class MainForm : Form //, ITiddlyWikiWatcherLogger
+    public partial class MainForm : Form, ITiddlyWikiWatcherSaveAs //, ITiddlyWikiWatcherLogger
     {
         private const string FormTitle = "Tiddly Wiki Watcher";
 
@@ -279,7 +279,7 @@ namespace TiddlyWikiWatcher
 
             // var downloadsPath = KnownFolderPaths.KnownFolders.GetPath(KnownFolderPaths.KnownFolder.Downloads);
             _watching = true;
-            _downloadHandler = new DownloadedFileHandler(filename, null);
+            _downloadHandler = new DownloadedFileHandler(filename, this, null);
 
             var webViewUserDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), singleInstanceMutexName);
             if (Directory.Exists(webViewUserDataFolder))
@@ -337,6 +337,36 @@ namespace TiddlyWikiWatcher
             });
         }
         */
+
+        public string TiddlyWikiWatcher_SaveAs(string tiddlyWikiFullpath, string fullpath)
+        {
+            return (string) this.Invoke((Func<string>)delegate 
+            {
+                var nameAndExtension = Path.GetFileName(fullpath).Trim();
+                var extension = Path.GetExtension(fullpath).Trim();
+
+                var filter = "All files (*.*)|*.*";
+                if (!string.IsNullOrWhiteSpace(extension))
+                {
+                    filter = 
+                        extension.Substring(1) + " files (*" + extension + ")|*" + extension + "|" +
+                        filter;
+                }
+
+                SaveFileDialog dialog = new SaveFileDialog();
+                dialog.Title = "Save file as";
+                dialog.FileName = nameAndExtension;
+                dialog.InitialDirectory = Path.GetDirectoryName(tiddlyWikiFullpath);
+                dialog.Filter = filter;
+                dialog.OverwritePrompt = true;
+                if (dialog.ShowDialog() != DialogResult.OK)
+                {
+                    return null;
+                }
+
+                return dialog.FileName;
+            });
+        }
 
         private void MainForm_Resize(object sender, EventArgs e)
         {

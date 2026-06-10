@@ -5,7 +5,7 @@ using System.Threading;
 
 namespace TiddlyWikiWatcher
 {
-    public class DownloadedFileHandler : IDisposable, ITiddlyWikiWatcherLogger
+    public class DownloadedFileHandler : IDisposable, ITiddlyWikiWatcherSaveAs, ITiddlyWikiWatcherLogger
     {
         private bool _terminate = false;
         private List<string> _fileQueue = new List<string>();
@@ -14,22 +14,30 @@ namespace TiddlyWikiWatcher
         private volatile bool _threadIsBusy = false;
 
         private ITiddlyWikiWatcherLogger _logger;
+        private ITiddlyWikiWatcherSaveAs _saveAs;
 
         private string _tiddlyWikiFullpath;
         private string _tiddlyWikiFilenameWithoutExtension;
         private string _tiddlyWikiExtension;
 
-        public DownloadedFileHandler(string tiddlyWikiFullpath, ITiddlyWikiWatcherLogger logger)
+        public DownloadedFileHandler(string tiddlyWikiFullpath, ITiddlyWikiWatcherSaveAs saveAs, ITiddlyWikiWatcherLogger logger)
         {
             _tiddlyWikiFullpath = tiddlyWikiFullpath;
             _tiddlyWikiFilenameWithoutExtension = Path.GetFileNameWithoutExtension(tiddlyWikiFullpath);
             _tiddlyWikiExtension = Path.GetExtension(tiddlyWikiFullpath);
 
+            _saveAs = (saveAs != null ? saveAs : this);
             _logger = (logger != null ? logger : this);
 
             _threadContinue = new Semaphore(0, int.MaxValue);
             _thread = new Thread(new ThreadStart(Main));
             _thread.Start();
+        }
+
+        public string TiddlyWikiWatcher_SaveAs(string tiddlyWikiFullpath, string fullpath)
+        {
+            //null saveAs, don't save anything
+            return null;
         }
 
         public void TiddlyWikiWatcher_Log(string text)
@@ -115,16 +123,66 @@ namespace TiddlyWikiWatcher
 
         private void HandleFile(string fullpath)
         {
-            try
+            string error;
+
+            _logger.TiddlyWikiWatcher_Log("Downloaded file: " + fullpath);
+
+            if (!File.Exists(fullpath))
             {
-                _logger.TiddlyWikiWatcher_Log("Downloaded file: " + fullpath);
-                string error = CheckForTiddlyWikiFile(fullpath);
-                if (!String.IsNullOrEmpty(error))
+                _logger.TiddlyWikiWatcher_Log("    Skip, file does not exist");
+            }
+
+
+            error = CheckForTiddlyWikiFile(fullpath);
+            if (String.IsNullOrEmpty(error))
+            {
+                _logger.TiddlyWikiWatcher_Log("    Handle the main TiddlyWiki file.");
+                HandleTiddlyWikiFile(fullpath);
+                return;
+            }
+            _logger.TiddlyWikiWatcher_Log("    Not the main TiddlyWiki file. " + error.Trim());
+
+            _logger.TiddlyWikiWatcher_Log("    Handle generic file download.");
+            HandleGenericFile(fullpath);
+        }
+
+        private string CheckForTiddlyWikiFile(string fullpath)
+        {
+            var name = Path.GetFileNameWithoutExtension(fullpath);
+            var extension = Path.GetExtension(fullpath);
+            if (extension != _tiddlyWikiExtension)
+            {
+                return "    Skip, extension \"" + extension + "\" should be \"" + _tiddlyWikiExtension + "\".";
+            }
+            if (name != _tiddlyWikiFilenameWithoutExtension)
+            {
+                if (!name.StartsWith(_tiddlyWikiFilenameWithoutExtension))
                 {
-                    _logger.TiddlyWikiWatcher_Log(error);
-                    return;
+                    return "    Skip, name \"" + name + "\" should start with \"" + _tiddlyWikiFilenameWithoutExtension + "\".";
                 }
 
+                // (1), (2) etc.
+                var name1 = name.Substring(_tiddlyWikiFilenameWithoutExtension.Length).Trim();
+                if (name1.Length > 0)
+                {
+                    if (name1[0] != '(')
+                    {
+                        return "    Skip, name suffix \"" + name1 + "\" should start with \"(\".";
+                    }
+                    if (name1[name1.Length - 1] != ')')
+                    {
+                        return "    Skip, name suffix \"" + name1 + "\" should end with \")\".";
+                    }
+                }
+            }
+
+            return String.Empty;
+        }
+
+        private void HandleTiddlyWikiFile(string fullpath)
+        {
+            try
+            {
                 if (File.Exists(_tiddlyWikiFullpath))
                 {
                     var backupfile = _tiddlyWikiFullpath + ".bak";
@@ -145,42 +203,32 @@ namespace TiddlyWikiWatcher
             }
         }
 
-        private string CheckForTiddlyWikiFile(string fullpath)
+        private void HandleGenericFile(string fullpath)
         {
-            if (!File.Exists(fullpath))
+            try
             {
-                return "    Skip, file does not exist";
-            }
-
-            var name = Path.GetFileNameWithoutExtension(fullpath);
-            var extension = Path.GetExtension(fullpath);
-            if (extension != _tiddlyWikiExtension)
-            {
-                return "    Skip, extension \"" + extension + "\" should be \"" + _tiddlyWikiExtension + "\"";
-            }
-            if (name != _tiddlyWikiFilenameWithoutExtension)
-            {
-                if (!name.StartsWith(_tiddlyWikiFilenameWithoutExtension))
+                var saveAs = _saveAs.TiddlyWikiWatcher_SaveAs(_tiddlyWikiFullpath, fullpath);
+                if (string.IsNullOrEmpty(saveAs))
                 {
-                    return "    Skip, name \"" + name + "\" should start with \"" + _tiddlyWikiFilenameWithoutExtension + "\"";
+                    _logger.TiddlyWikiWatcher_Log("    Save-as is canceled.");
+                    return;
                 }
 
-                // (1), (2) etc.
-                var name1 = name.Substring(_tiddlyWikiFilenameWithoutExtension.Length).Trim();
-                if (name1.Length > 0)
+                if (File.Exists(saveAs))
                 {
-                    if (name1[0] != '(')
-                    {
-                        return "    Skip, name suffix \"" + name1 + "\" should start with \"(\"";
-                    }
-                    if (name1[name1.Length - 1] != ')')
-                    {
-                        return "    Skip, name suffix \"" + name1 + "\" should end with \")\"";
-                    }
+                    _logger.TiddlyWikiWatcher_Log("    Delete existing file " + saveAs);
+                    Retried_FileDelete(saveAs, 30);
                 }
-            }
 
-            return String.Empty;
+                _logger.TiddlyWikiWatcher_Log("    Move download to " + saveAs);
+                Retried_FileMove(fullpath, saveAs, 30);
+
+                _logger.TiddlyWikiWatcher_Log("    Done");
+            }
+            catch (Exception ex)
+            {
+                _logger.TiddlyWikiWatcher_Log("    ERROR: " + ex.Message);
+            }
         }
 
         private void Retried_FileDelete(string fullpath, int seconds)
